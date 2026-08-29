@@ -1,121 +1,186 @@
-# Face Scan — Android
+# Multi-Camera Smart Attendance
 
-360°-guided face scan → on-device face embedding (MobileFaceNet/FaceNet
-TFLite) → printed to the debug console.
+A Flutter mobile client for a smart classroom attendance system. Students enroll their face, join classes, and review attendance. Teachers create classes, run camera-based attendance sessions, monitor recognition results, and correct attendance records.
 
-This folder contains the **complete `lib/` app, `pubspec.yaml`, and a full
-hand-written `android/` project** (manifest, Gradle files, MainActivity).
-It was written outside of Flutter (no Flutter SDK / internet access in the
-build sandbox), so before first run you need to let Flutter regenerate the
-two things it always auto-generates locally:
+The app connects to a separate FastAPI backend, which manages authentication, classes, rooms, cameras, face recognition, and attendance calculation.
 
-## Two apps in one
+## Features
 
-This project is now a **Smart Classroom Attendance client** that talks to the
-FastAPI backend in `a/`, with the original **360° face-embedding demo**
-kept as a standalone tool.
+### Students
 
-- **Attendance app (default flow):** launch → sign in / register → role
-  dashboard.
-  - *Teachers* register with an invite code, create classes, and share join
-    codes. Tapping a class opens its roster, each student's attendance
-    history, and a delete-class action.
-  - *Students* register with their roll number and **5 face photos** (captured
-    in-app, validated to contain exactly one face each), join classes by code,
-    and view their attendance %, Present/Late/Absent counts, and session
-    history.
-  - Point the app at your backend from the login screen's **Server settings**
-    (default `http://10.0.2.2:8000` for the Android emulator; use your
-    machine's LAN IP from a physical device — the `/api/v1` suffix is added
-    automatically).
-- **Face embedding demo:** reachable from the login screen via *"Try the face
-  embedding demo"* — the 360° scan described below that prints an embedding to
-  the console.
+- Register with name, email, roll number, and password
+- Complete a guided five-pose face enrollment scan
+- Join classes using a class code
+- View attendance percentage and Present/Late/Absent totals
+- Review session history and filter it by date
+- Keep the login session and API server setting across app restarts
 
-Student-registration photos are uploaded to `POST /auth/register/student`; the
-backend derives and stores the face embeddings, so the same records power the
-web dashboards and recognition workers.
+### Teachers
 
-> **Where matching actually happens.** Attendance recognition runs entirely on
-> the backend (`a/`) using **InsightFace** — SCRFD face detection + landmark
-> alignment + ArcFace 512-d embeddings — over the room's CCTV/IP cameras. The
-> on-device **MobileFaceNet** model below powers only the standalone 360°
-> embedding demo; it is not used for attendance and its vectors are never sent
-> to the server (the app uploads the five enrollment photos and the backend
-> computes the embeddings).
+- Register with an administrator-provided invite code
+- Create classes and share their join codes
+- View class rosters and individual student attendance
+- Start and stop live attendance sessions using a configured room
+- Select and preview room camera feeds
+- Monitor recent face-recognition sightings
+- Review completed sessions
+- Override incorrect attendance records
+- Delete sessions and classes
 
-## 1. One-time setup
+### Administrators
 
-```bash
-# from this folder
-flutter create --platforms=android --org com.example -a kotlin --project-name face_scan_android .
+Administrator accounts can sign in, but room and camera configuration is handled by the backend's web dashboard rather than this mobile client.
+
+## How face attendance works
+
+1. During student registration, the app uses the front camera and Google ML Kit to guide the student through five poses: front, left, right, up, and down.
+2. The five JPEG images are uploaded to the backend.
+3. The backend validates the images and creates the student's face-recognition profile.
+4. A teacher starts a session for a class and a configured room.
+5. The backend processes the room's enabled camera feeds, records sightings, and calculates attendance when the session ends.
+
+Face matching is performed by the backend. The mobile app does not use its local TFLite embedding code for production attendance.
+
+## Tech stack
+
+- Flutter and Dart
+- `camera` for enrollment capture
+- Google ML Kit Face Detection for face and pose guidance
+- `http` for REST API communication and multipart image uploads
+- `shared_preferences` for token and server URL persistence
+- Material 3 UI with Google Fonts
+
+## Project structure
+
+```text
+lib/
+├── main.dart                 # App startup and authentication initialization
+├── models/                   # User, class, camera, and attendance models
+├── screens/                  # Authentication, dashboards, scans, and sessions
+├── services/
+│   ├── api_service.dart      # FastAPI REST client
+│   ├── auth_store.dart       # Persisted token and API URL
+│   └── embedding_service.dart# Optional local embedding/demo support
+├── widgets/                  # Shared UI components
+└── theme.dart                # App colors and theme
 ```
 
-Run this **once**, in this exact folder — `flutter create` will not
-overwrite the `lib/`, `pubspec.yaml`, or `android/` files already here
-(it only fills in things that are missing, like launcher icons,
-`android/local.properties`, and the Gradle wrapper jar). If it ever asks
-to overwrite a file, say **no**.
+## Requirements
 
-Then:
+- Flutter 3.19 or newer
+- Dart 3.3 or newer
+- Android device or emulator with camera support
+- A running, compatible Smart Attendance FastAPI backend
+- At least one backend room and camera configured before starting live sessions
+
+> A physical device is recommended for face enrollment. An emulator can be used for general UI and API testing if it has a usable camera source.
+
+## Getting started
+
+### 1. Install dependencies
+
+From the project root:
 
 ```bash
 flutter pub get
 ```
 
-## 2. Add a face embedding model
+### 2. Configure the backend URL
 
-Drop a MobileFaceNet or FaceNet `.tflite` model (112×112 RGB input,
-~128–512-d embedding output) at:
+The URL must point to the machine running the backend. The app automatically appends `/api/v1` when the entered URL does not already contain an API path.
 
+You can configure it in either of these ways:
+
+#### In the app
+
+Open **Server settings** from the sign-in screen and enter a URL such as:
+
+```text
+http://192.168.1.10:8000
 ```
-assets/models/mobilefacenet.tflite
+
+#### At build or run time
+
+```bash
+flutter run --dart-define=API_BASE_URL=http://192.168.1.10:8000/api/v1
 ```
 
-Until you do, the app still runs end-to-end using a deterministic stub
-embedding (clearly logged as such) so you can test the camera/pose/print
-pipeline first. Search "mobilefacenet.tflite" — several MIT/Apache-licensed
-conversions are available; if your model's input size or output dimension
-differs, update `inputSize` / `outputSize` in
-`lib/services/embedding_service.dart`.
+Common development addresses:
 
-## 3. Run
+| Environment | Example backend URL |
+|---|---|
+| Android emulator | `http://10.0.2.2:8000` |
+| Physical Android device | `http://<computer-LAN-IP>:8000` |
+| Production | `https://attendance.example.com` |
+
+The device and backend computer must be reachable from each other. Do not use `localhost` on a physical device—it refers to the phone itself.
+
+The source currently has a development fallback URL in `lib/services/api_service.dart`. Prefer the in-app setting or `--dart-define` instead of committing a machine-specific address.
+
+### 3. Run the app
 
 ```bash
 flutter run
 ```
 
-## What it does
+To choose a specific device:
 
-1. Home screen → **Start face scan** (requests camera permission).
-2. Front camera opens with `google_mlkit_face_detection` running live on
-   the frame stream, reading `headEulerAngleY` (yaw) / `headEulerAngleX`
-   (pitch).
-3. You're guided through 5 poses that together cover a full head
-   rotation: **Center → Left → Right → Up → Down**. Each is auto-captured
-   the moment your head is in range — no button mashing.
-4. Once all 5 are captured, every crop is run through the TFLite model
-   and averaged + L2-normalized into one identity embedding.
-5. The embedding is printed to the console as:
-   ```
-   === FACE_EMBEDDING (dim=192) ===
-   [0.041233, -0.118820, ...]
-   ```
-6. A result screen shows a short preview of the vector.
+```bash
+flutter devices
+flutter run -d <device-id>
+```
 
-## Theme
+## Typical workflow
 
-Colors/typography in `lib/theme.dart` are mapped 1:1 from the supplied
-CSS tokens (`--green #146c4a`, `--canvas #f6f7f4`, `--ink #17201c`,
-Inter font, etc.), and `lib/widgets/gradient_action_button.dart`
-recreates the animated `.ask-ai-button` gradient/sheen.
+1. An administrator configures rooms and cameras in the web dashboard and provides the teacher invite code.
+2. A teacher creates an account and creates a class.
+3. Students register, complete face enrollment, and join the class using its join code.
+4. The teacher opens the class, starts a live session, enters the configured room code, and selects the attendance settings.
+5. The backend processes camera frames while the app displays the live preview and recent sightings.
+6. The teacher stops the session, reviews calculated attendance, and applies corrections if required.
+7. Students can refresh their dashboards to see the completed session.
 
-## Notes
+## API integration
 
-- Minimum SDK is 23 (required by CameraX / ML Kit / TFLite deps).
-- No launcher icons are included — `flutter create` (step 1) generates
-  the default ones; swap them via `flutter_launcher_icons` if you want
-  custom branding.
-- Face embeddings are biometric data — handle/store them per your
-  applicable privacy laws; this sample only prints to console and keeps
-  nothing on disk.
+The client expects a backend under `/api/v1` with endpoints for:
+
+- authentication and student/teacher registration
+- current-user validation
+- class creation, joining, rosters, and deletion
+- room camera discovery
+- session creation, live previews, sightings, and stopping
+- attendance summaries and teacher overrides
+
+Authentication uses a bearer token returned by the backend. The token and selected API URL are stored locally with `shared_preferences`.
+
+## Permissions and networking
+
+The Android app requests:
+
+- `CAMERA` for student face enrollment
+- `INTERNET` for backend communication and live previews
+
+Cleartext HTTP is enabled in the Android manifest for local development. Use HTTPS in production and apply stricter network security rules before release.
+
+## Testing and analysis
+
+```bash
+flutter analyze
+flutter test
+```
+
+## Privacy and security
+
+Face images and embeddings are biometric data. Before deploying this project:
+
+- obtain informed consent from users
+- use HTTPS for all client-server traffic
+- restrict access to enrollment images and embeddings
+- define retention and deletion policies
+- protect backend credentials, tokens, room codes, and teacher invite codes
+- follow applicable privacy, biometric-data, and education-record regulations
+- never commit production secrets or biometric data to the repository
+
+## Current scope
+
+This repository contains the Flutter client only. The FastAPI backend, recognition workers, database, camera services, and administrator web dashboard must be deployed separately.

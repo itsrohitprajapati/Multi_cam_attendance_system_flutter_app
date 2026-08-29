@@ -10,7 +10,7 @@ The app builds from a single Flutter codebase and runs natively on **both Androi
 |---|---|---|
 | Android | 5.0 (API 21) | `minSdkVersion` uses the Flutter default (21), which satisfies the CameraX / ML Kit requirement; compiles and targets API 36 with Java 17 |
 | iOS | 15.5 | `google_mlkit_face_detection` requires iOS 15.5+, so the deployment target in `ios/Podfile` and the Xcode project is pinned there; runs on iPhone and iPad |
-| Web & Backend | refer this -> | https://github.com/shubhamxdd/a |
+| Web & Backend | refer this > | https://github.com/shubhamxdd/a |
 
 Toolchain notes:
 

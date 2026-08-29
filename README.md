@@ -234,7 +234,3 @@ Face images and embeddings are biometric data. Before deploying this project:
 - protect backend credentials, tokens, room codes, and teacher invite codes
 - follow applicable privacy, biometric-data, and education-record regulations
 - never commit production secrets or biometric data to the repository
-
-## Current scope
-
-This repository contains the Flutter client only. The FastAPI backend, recognition workers, database, camera services, and administrator web dashboard must be deployed separately.
